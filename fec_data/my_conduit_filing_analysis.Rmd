@@ -1,0 +1,632 @@
+---
+title: "2023 Mid-Year Conduit Filing Analysis"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document:
+    latex_engine: lualatex
+    keep_tex: true
+header-includes:
+  - \usepackage{fontspec}
+  - \setmainfont{Arial}
+  - \usepackage{xcolor}
+  - \usepackage{titlesec}
+  - \definecolor{blue_base}{HTML}{008dc9}
+  - \definecolor{blue_strong}{HTML}{0f2d5b}
+  - \definecolor{blue_weak}{HTML}{90d3fb}
+  - \definecolor{black_base}{HTML}{000000}
+  - \definecolor{black_weak}{HTML}{595959}
+  - \definecolor{black_weakest}{HTML}{cccccc}
+  - \definecolor{white_base}{HTML}{ffffff}
+  - \definecolor{white_weak}{HTML}{f7f7f7}
+  - \definecolor{cat_0_strong}{HTML}{cc850a}
+  - \definecolor{cat_0_text}{HTML}{754d06}
+  - \definecolor{cat_1_base}{HTML}{f26829} 
+  - \definecolor{cat_1_strong}{HTML}{e85130}
+  - \definecolor{cat_1_text}{HTML}{9a3709}
+  - \definecolor{cat_2_base}{HTML}{bd53bd}
+  - \definecolor{cat_2_text}{HTML}{8e2f8e}
+  - \definecolor{cat_3_base}{HTML}{6363c0} 
+  - \definecolor{cat_3_text}{HTML}{4b4baf}
+  - \definecolor{cat_4_base}{HTML}{008dc9}
+  - \definecolor{cat_4_text}{HTML}{245993}
+  - \definecolor{cat_5_base}{HTML}{40bf73}
+  - \definecolor{cat_5_strong}{HTML}{37a463}
+  - \definecolor{cat_5_text}{HTML}{1d6339}
+  - \definecolor{cat_99_base}{HTML}{cccccc}
+  - \definecolor{cat_99_strong}{HTML}{878787}
+  - \definecolor{cat_99_text}{HTML}{595959}
+  - \definecolor{ab_midnight}{HTML}{1C2345}
+  - \definecolor{ab_marigold}{HTML}{FFA300}
+  - \titleformat{\title}{\color{black_base}}{}{0pt}{}
+  - \titleformat{\section}{\Large\color{cat_4_text}}{}{0pt}{}
+  - \titleformat{\subsection}{\large\color{cat_0_strong}}{}{0pt}{}
+  - \titlespacing\section{0pt}{24pt plus 4pt minus 2pt}{6pt plus 2pt minus 2pt}
+  - \titlespacing\subsection{0pt}{12pt plus 4pt minus 2pt}{2pt plus 2pt minus 2pt}
+  - \usepackage{fancyhdr}
+  - \usepackage{lastpage}
+  - \pagestyle{fancy}
+  - \fancyhead[LO,LE]{Mid-Year Conduit Filing Analysis} 
+  - \fancyhead[RO,RE]{Page \thepage \hspace{1pt} of \pageref{LastPage}}
+  - \fancyfoot[LO,LE]{sarah.mathey@gmail.com}
+  - \color{cat_99_text}
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width=12, fig.height=8, fig.align = "center")
+
+library(tidyverse)
+library(DBI)
+library(RSQLite)
+library(flextable)
+library(scales)
+library(lubridate)
+
+
+source("viz_theme.R")
+source("file_paths.R")
+source("sql_queries_ab_2019.R")
+source("sql_queries_ab_2023.R")
+source("sql_queries_wr_2023.R")
+source("sql_queries_wr_ab_xcycle.R")
+
+database_file <- database_path
+conn <- dbConnect(RSQLite::SQLite(), dbname = database_file)
+
+set_flextable_defaults(
+  font.size = 10,
+  font.family = "Arial",
+  theme_fun = theme_zebra,
+  padding = 6)
+
+ttl_raised_ab_2019_my <- ttl_raised_ab_2019_my%>%dbGetQuery(conn, .)
+tips_raised_ab_2019_my <- tips_raised_ab_2019_my%>%dbGetQuery(conn, .)
+tip_rate_ab_2019_my <- tips_raised_ab_2019_my/ttl_raised_ab_2019_my
+
+ttl_raised_ab_2023_my <- ttl_raised_ab_2023_my%>%dbGetQuery(conn, .)
+tips_raised_ab_2023_my <- tips_raised_ab_2023_my%>%dbGetQuery(conn, .)
+tip_rate_ab_2023_my <- tips_raised_ab_2023_my/ttl_raised_ab_2023_my
+
+ttl_raised_wr_2023_my <- ttl_raised_wr_2023_my%>%dbGetQuery(conn, .)
+
+
+
+
+
+by_cmte_wr_2023_my <- by_cmte_wr_2023_my %>%dbGetQuery(conn, .)
+
+wr_by_cmte_tp_2023<-
+  by_cmte_wr_2023_my%>%group_by(cmte_tp)%>%summarise(ttl_raised=sum(total_raised))
+
+wr_by_cmte_tp_2023$cmte_tp_clean = case_when(
+  wr_by_cmte_tp_2023$cmte_tp == "S" ~ "Senate",
+  wr_by_cmte_tp_2023$cmte_tp == "H" ~ "House",
+  wr_by_cmte_tp_2023$cmte_tp == "P" ~ "Presidential",
+  wr_by_cmte_tp_2023$cmte_tp == "X" ~ "Party Committee",
+  wr_by_cmte_tp_2023$cmte_tp == "Y" ~ "Party Committee",
+  wr_by_cmte_tp_2023$cmte_tp == "Z" ~ "Party Committee",
+  wr_by_cmte_tp_2023$cmte_tp %in% c("I","O","U")  ~ "Independent Expenditure",
+  wr_by_cmte_tp_2023$cmte_tp %in% c("N","Q","V","W")  ~ "PAC",
+  wr_by_cmte_tp_2023$cmte_tp %in% c("C","E")  ~ "Communication Costs",
+  wr_by_cmte_tp_2023$cmte_tp == "D"  ~ "Delegate Committee"
+)
+
+
+# cross cycles 
+pres_launches <- ab_pres_launches %>%dbGetQuery(conn, .)
+
+biden_my<- biden_my %>%dbGetQuery(conn, .)
+trump_my<- trump_my %>%dbGetQuery(conn, .)
+
+
+cmte_first_days <- cmte_first_days %>%dbGetQuery(conn, .)
+
+cmte_top_days <- cmte_top_days %>%dbGetQuery(conn, .)
+
+dbDisconnect(conn)
+```
+## Outline
+
+- Explain what is in the filing (federal conduit, and what is not, state, local, non profits c4s and c3s) Note winred didn't have any substantial dollars raised until YE filing so excluded for 2019 analyses 
+
+I. Conduit Toplines and Daily Fundraising
+II. Top Days and Committees
+III. Presidential Trends & Head to Head
+IV. Senate Fundraising
+V. House Fundraising 
+
+
+```{r toplines, echo=FALSE}
+ab_2019_toplines <-ab_2019_toplines %>%dbGetQuery(conn, .)
+ab_2019_toplines<- ab_2019_toplines%>%mutate(avg_contribution = amt_raised/n_contributions, row_name="ActBlue 2019 MY")
+ab_2023_toplines <-ab_2023_toplines %>%dbGetQuery(conn, .)
+ab_2023_toplines<- ab_2023_toplines%>%mutate(avg_contribution = amt_raised/n_contributions, row_name="ActBlue 2023 MY")
+wr_2023_toplines <-wr_2023_toplines %>%dbGetQuery(conn, .)
+wr_2023_toplines<- wr_2023_toplines%>%mutate(avg_contribution = amt_raised/n_contributions, row_name="WinRed 2023 MY")
+
+conduit_toplines<- bind_rows(ab_2019_toplines, ab_2023_toplines, wr_2023_toplines)
+
+conduit_toplines_ft<-flextable(conduit_toplines,
+              col_keys = c("row_name","n_contributions", "amt_raised", "avg_contribution","n_donors",  "n_committees"))
+conduit_toplines_ft <- set_header_labels(conduit_toplines_ft, 
+                        row_name = "",
+                        n_contributions = "Contributions", 
+                        amt_raised = "Total Raised",
+                        avg_contribution = "Avg. Contribution",
+                        n_donors = "Donors",
+                        n_committees = "Committees")
+conduit_toplines_ft <- align(conduit_toplines_ft, i = 1, j = NULL, align = "center", part = "header")
+conduit_toplines_ft <- colformat_double(conduit_toplines_ft, 
+  j = c(3),
+  digits = 0,
+  prefix = "$",
+  suffix = "")
+conduit_toplines_ft <- colformat_double(conduit_toplines_ft, 
+  j = c(4),
+  digits = 2,
+  prefix = "$",
+  suffix = "")
+conduit_toplines_ft <- bold(conduit_toplines_ft, 
+  j = 1)
+
+conduit_toplines_ft <- bg(conduit_toplines_ft, bg = "#e2eaf1", part = "header")
+conduit_toplines_ft <- add_header_lines(conduit_toplines_ft, 
+  values = c("Conduit Fundraising Toplines January - June") ) 
+
+conduit_toplines_ft
+```
+In the first six months of 2023:
+
+- Federal contributions processed through ActBlue's conduit decreased `r round((ab_2019_toplines$amt_raised-ab_2023_toplines$amt_raised)/(ab_2019_toplines$amt_raised),3)*100.00`% compared to the first six months of 2019. (Understandable given the lack of a competitive Democratic Presidential Primary)
+- Donors contributed `r round((ab_2023_toplines$amt_raised-wr_2023_toplines$amt_raised)/(wr_2023_toplines$amt_raised),3)*100.00`% more through ActBlue's federal conduit than WinRed's
+- More than twice as many donors contributed more than double the contributions to over a thousand more committees, through ActBlue's federal conduit than through WinRed's
+
+```{r by day cumulative, echo=FALSE}
+
+ab_by_day <-ab_daily %>%dbGetQuery(conn, .)
+ab_by_day<-ab_by_day%>%mutate(yday=lubridate::yday(contribution_date), running_total = cumsum(total_raised))
+
+ab_by_day_19<-ab_by_day%>%filter(contribution_date<='2019-12-31')
+ab_by_day_23<-ab_by_day%>%filter(contribution_date>'2019-12-31')
+ab_by_day_23<-ab_by_day_23%>%mutate(running_total_fixed=cumsum(total_raised))
+
+wr_by_day <-wr_daily %>%dbGetQuery(conn, .)
+wr_by_day<-wr_by_day%>%mutate(yday=lubridate::yday(contribution_date), running_total = cumsum(total_raised))
+
+ggplot()+
+geom_line(data=ab_by_day_19,aes(x=yday,y=running_total, color="ab_2019"), group=1)+
+geom_line(data=ab_by_day_23,aes(x=yday,y=running_total_fixed, color="ab_2023"), group=1)+
+geom_line(data=wr_by_day,aes(x=yday,y=running_total, color="wr_2023"),  group=1)+
+scale_x_continuous(breaks = c(1,31,59,90,120,151,181), labels= c("Jan","Feb","Mar","Apr","May","Jun","Jul") )+
+scale_y_continuous(limits=c(0,400000000), breaks = c(0, 100000000,200000000,300000000,400000000), labels= c("$0M","$100M","$200M","$300M","$400M"))+
+scale_color_manual(values=c(hex$blue_weak,hex$blue_base,hex$biden_red_75),
+                     labels = c("ActBlue 2019", "ActBlue 2023", "WinRed 2023"),
+                   name="")+
+xlab("Month")+
+ylab("Dollars Raised")+
+labs(title="Cumulative Dollars Raised Through Conduits", subtitle="January - June")+
+sjm_theme()
+
+
+```
+```{r by day, echo=FALSE}
+ggplot()+
+geom_line(data=ab_by_day_19,aes(x=yday,y=total_raised, color="ab_2019"), group=1)+
+geom_line(data=ab_by_day_23,aes(x=yday,y=total_raised, color="ab_2023"), group=1)+
+geom_line(data=wr_by_day,aes(x=yday,y=total_raised, color="wr_2023"),  group=1)+
+scale_x_continuous(breaks = c(1,31,59,90,120,151,181), labels= c("Jan","Feb","Mar","Apr","May","Jun","Jul") )+
+scale_y_continuous(limits=c(0,12000000), breaks = c(0,4000000,8000000,12000000), labels= c("$0M","$4M","$8M","$12M"))+
+scale_color_manual(values=c(hex$blue_weak,hex$blue_base,hex$biden_red_75),
+                     labels = c("ActBlue 2019", "ActBlue 2023", "WinRed 2023"),
+                   name="")+
+geom_text(
+    aes(label="Sanders 2019 Launch", 
+    x=45,
+    y=7150000),
+    size = 2,
+    color = hex$blue_weak
+  )+
+  geom_text(
+    aes(label="O'Rourke 2019 Launch", 
+    x=75,
+    y=7850010),
+    size = 2,
+    color = hex$blue_weak
+  )+
+   geom_text(
+    aes(label="Biden Launches", 
+    x=115,
+    y=7850000),
+    size = 2,
+    color = hex$blue_base
+  )+
+   geom_text(
+    aes(label="Trump Legal News", 
+    x=100,
+    y=5300010),
+    size = 2,
+    color = hex$biden_red_75
+    )+
+xlab("Month")+
+ylab("Dollars Raised")+
+labs(title="Daily Dollars Raised Through Conduits", subtitle="January - June")+
+sjm_theme()
+
+# April 25 - biden
+# Feb 19 Bernie
+# March 13 Beto
+# Early April Trump Indictments
+```
+- There were less than five days in where dollars raised through WinRed's federal conduit surpassed those raised through ActBlue in the first six months of 2023.
+```{r top ab committees 2023, echo=FALSE}
+by_cmte_ab_2023_my <- by_cmte_ab_2023_my %>%dbGetQuery(conn, .)
+by_cmte_wr_2023_my <- by_cmte_wr_2023_my %>%dbGetQuery(conn, .)
+
+ab_top_recipients_ft<-by_cmte_ab_2023_my%>%arrange(desc(total_raised))%>%slice(1:10)
+ab_top_recipients_ft<-ab_top_recipients_ft%>%mutate(cmte_nm = str_to_title(cmte_nm), pct_filing_norm=100.00*pct_filing)
+ab_top_recipients_ft<-flextable(ab_top_recipients_ft,
+              col_keys = c("cmte_nm",  "total_raised","pct_filing_norm" ))
+ab_top_recipients_ft <- set_header_labels(ab_top_recipients_ft, 
+                        cmte_nm = "Committee Name",
+                        total_raised = "Total Raised",
+                        pct_filing_norm = "% Total Raised through ActBlue")
+ab_top_recipients_ft <- align(ab_top_recipients_ft, i = 1, j = NULL,  align = "center", part = "header")
+ab_top_recipients_ft <- bg(ab_top_recipients_ft, bg = "#e2eaf1", part = "header")
+ab_top_recipients_ft <-width(ab_top_recipients_ft, j = 1, 2, unit = "in")
+ab_top_recipients_ft <-width(ab_top_recipients_ft, j = 3, 1.5, unit = "in")
+ab_top_recipients_ft <- colformat_double(ab_top_recipients_ft, 
+  j = 2,
+  digits = 0,
+  prefix = "$",
+  suffix = "")
+ab_top_recipients_ft <- colformat_double(ab_top_recipients_ft, 
+  j = 3,
+  digits = 1,
+  prefix = "",
+  suffix = "%")
+
+ab_top_recipients_ft
+
+
+
+
+```
+- Adam Schiff's CA Senate campaign represented the top fundraiser on ActBlue in the first six months of 2023.
+- *Note: Contribution to ActBlue signifies the money that donors elect to give to ActBlue in the form of tips, which support its operating costs*
+```{r winred top committees, echo=FALSE}
+wr_top_recipients_ft<-by_cmte_wr_2023_my%>%arrange(desc(total_raised))%>%slice(1:10)
+wr_top_recipients_ft<-wr_top_recipients_ft%>%mutate(cmte_nm = str_to_title(cmte_nm), pct_filing_norm=100.00*pct_filing)
+wr_top_recipients_ft<-flextable(wr_top_recipients_ft,
+              col_keys = c("cmte_nm",  "total_raised","pct_filing_norm" ))
+wr_top_recipients_ft <- set_header_labels(wr_top_recipients_ft, 
+                        cmte_nm = "Committee Name",
+                        total_raised = "Total Raised",
+                        pct_filing_norm = "% Total Raised through WinRed")
+wr_top_recipients_ft <- align(wr_top_recipients_ft, i = 1, j = NULL,  align = "center", part = "header")
+wr_top_recipients_ft <- bg(wr_top_recipients_ft, bg = "#f5e1e1", part = "header")
+wr_top_recipients_ft <-width(wr_top_recipients_ft, j = 1, 2, unit = "in")
+wr_top_recipients_ft <-width(wr_top_recipients_ft, j = 3, 1.5, unit = "in")
+wr_top_recipients_ft <- colformat_double(wr_top_recipients_ft, 
+  j = 2,
+  digits = 0,
+  prefix = "$",
+  suffix = "")
+wr_top_recipients_ft <- colformat_double(wr_top_recipients_ft, 
+  j = 3,
+  digits = 1,
+  prefix = "",
+  suffix = "%")
+
+wr_top_recipients_ft
+```
+- In the first six months of 2023, Trump and the Republican National Committees represented 44.3% of WinRed's total fundraising. Comparatively, Biden and the Democratic National Party Committees represented 15.2% of ActBlue's total fundraising. 
+  
+```{r by cmte type ab 2019, echo=FALSE}
+by_cmte_ab_2019_my <- by_cmte_ab_2019_my %>%dbGetQuery(conn, .)
+
+ab_by_cmte_tp_2019<-
+  by_cmte_ab_2019_my%>%group_by(cmte_tp)%>%summarise(ttl_raised=sum(total_raised))
+
+ab_by_cmte_tp_2019$cmte_tp_clean = case_when(
+  ab_by_cmte_tp_2019$cmte_tp == "S" ~ "Senate",
+  ab_by_cmte_tp_2019$cmte_tp == "H" ~ "House",
+  ab_by_cmte_tp_2019$cmte_tp == "P" ~ "Presidential",
+  ab_by_cmte_tp_2019$cmte_tp == "X" ~ "Party Committee",
+  ab_by_cmte_tp_2019$cmte_tp == "Y" ~ "Party Committee",
+  ab_by_cmte_tp_2019$cmte_tp == "Z" ~ "Party Committee",
+  ab_by_cmte_tp_2019$cmte_tp %in% c("I","O","U")  ~ "Independent Expenditure",
+  ab_by_cmte_tp_2019$cmte_tp %in% c("N","Q","V","W")  ~ "PAC",
+  ab_by_cmte_tp_2019$cmte_tp %in% c("C","E")  ~ "Communication Costs",
+  ab_by_cmte_tp_2019$cmte_tp == "D"  ~ "Delegate Committee"
+)
+
+# Compute percentages
+ab_by_cmte_tp_2019_clean<-ab_by_cmte_tp_2019%>%group_by(cmte_tp_clean)%>%summarise(ttl_raised=sum(ttl_raised))
+
+ab_by_cmte_tp_2019_clean$fraction = ab_by_cmte_tp_2019_clean$ttl_raised / sum(ab_by_cmte_tp_2019_clean$ttl_raised)
+
+# Compute the cumulative percentages (top of each rectangle)
+ab_by_cmte_tp_2019_clean$ymax = cumsum(ab_by_cmte_tp_2019_clean$fraction)
+
+# Compute the bottom of each rectangle
+ab_by_cmte_tp_2019_clean$ymin = c(0, head(ab_by_cmte_tp_2019_clean$ymax, n=-1))
+
+# Compute label position
+ab_by_cmte_tp_2019_clean$labelPosition <- (ab_by_cmte_tp_2019_clean$ymax + ab_by_cmte_tp_2019_clean$ymin) / 2
+
+# Compute a good label
+ab_by_cmte_tp_2019_clean$label <- paste0(ab_by_cmte_tp_2019_clean$cmte_tp_clean, "\n : ", ab_by_cmte_tp_2019_clean$fraction)
+ 
+# Make the plot
+ab_by_cmte_tp_2019_clean %>%
+ggplot(aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=cmte_tp_clean)) +
+     geom_rect() +
+     coord_polar(theta="y") + # Try to remove that to understand how the chart is built initially
+     xlim(c(2, 4))+# Try to remove that to see how to make a pie chart
+geom_text( x=3.5, aes(y=labelPosition, label=paste(round(fraction*100.00,1),'%')), color=hex$white_weak, size=3) +
+    sjm_theme()+
+    theme_void()+
+    scale_fill_manual(values=c(
+      hex$blue_weak
+      ,hex$cat_2_base
+      ,hex$cat_3_base
+      ,hex$cat_4_text
+      ,hex$blue_strong
+      ,hex$blue_base
+      ,hex$cat_99_base
+    ))+
+    theme(
+    text               = element_text(color = hex$cat_99_text, family = "Arial"),
+    legend.position    = "top",
+    plot.title         = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle      = element_text(size = 9, margin = margin(9,0,9,0), hjust = 0.5)
+  )+
+  labs(fill = "Committee Type", title="Proportion of Dollars Raised through 2019 ActBlue by Committee Type")
+
+
+```
+```{r by cmte type ab 2023, echo=FALSE}
+ab_by_cmte_tp_2023<-
+  by_cmte_ab_2023_my%>%group_by(cmte_tp)%>%summarise(ttl_raised=sum(total_raised))
+
+ab_by_cmte_tp_2023$cmte_tp_clean = case_when(
+  ab_by_cmte_tp_2023$cmte_tp == "S" ~ "Senate",
+  ab_by_cmte_tp_2023$cmte_tp == "H" ~ "House",
+  ab_by_cmte_tp_2023$cmte_tp == "P" ~ "Presidential",
+  ab_by_cmte_tp_2023$cmte_tp == "X" ~ "Party Committee",
+  ab_by_cmte_tp_2023$cmte_tp == "Y" ~ "Party Committee",
+  ab_by_cmte_tp_2023$cmte_tp == "Z" ~ "Party Committee",
+  ab_by_cmte_tp_2023$cmte_tp %in% c("I","O","U")  ~ "Independent Expenditure",
+  ab_by_cmte_tp_2023$cmte_tp %in% c("N","Q","V","W")  ~ "PAC",
+  ab_by_cmte_tp_2023$cmte_tp %in% c("C","E")  ~ "Communication Costs",
+  ab_by_cmte_tp_2023$cmte_tp == "D"  ~ "Delegate Committee"
+)
+# Compute percentages
+ab_by_cmte_tp_2023_clean<-ab_by_cmte_tp_2023%>%group_by(cmte_tp_clean)%>%summarise(ttl_raised=sum(ttl_raised))
+
+ab_by_cmte_tp_2023_clean$fraction = ab_by_cmte_tp_2023_clean$ttl_raised / sum(ab_by_cmte_tp_2023_clean$ttl_raised)
+
+# Compute the cumulative percentages (top of each rectangle)
+ab_by_cmte_tp_2023_clean$ymax = cumsum(ab_by_cmte_tp_2023_clean$fraction)
+
+# Compute the bottom of each rectangle
+ab_by_cmte_tp_2023_clean$ymin = c(0, head(ab_by_cmte_tp_2023_clean$ymax, n=-1))
+
+# Compute label position
+ab_by_cmte_tp_2023_clean$labelPosition <- (ab_by_cmte_tp_2023_clean$ymax + ab_by_cmte_tp_2023_clean$ymin) / 2
+
+# Compute a good label
+ab_by_cmte_tp_2023_clean$label <- paste0(ab_by_cmte_tp_2023_clean$cmte_tp_clean, "\n : ", ab_by_cmte_tp_2023_clean$fraction)
+ 
+# Make the plot
+ab_by_cmte_tp_2023_clean %>%
+ggplot(aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=cmte_tp_clean)) +
+     geom_rect() +
+     coord_polar(theta="y") + # Try to remove that to understand how the chart is built initially
+     xlim(c(2, 4))+# Try to remove that to see how to make a pie chart
+geom_text( x=3.5, aes(y=labelPosition, label=paste(round(fraction*100.00,1),'%')), color=hex$white_weak, size=3) +
+    sjm_theme()+
+    theme_void()+
+    scale_fill_manual(values=c(
+      hex$blue_weak
+      ,hex$cat_2_base
+      ,hex$cat_3_base
+      ,hex$cat_4_text
+      ,hex$blue_strong
+      ,hex$blue_base
+      ,hex$cat_99_base
+    ))+
+    theme(
+    text               = element_text(color = hex$cat_99_text, family = "Noto Sans"),
+    legend.position    = "top",
+    plot.title         = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle      = element_text(size = 9, margin = margin(9,0,9,0), hjust = 0.5)
+  )+
+  labs(fill = "Committee Type", title="Proportion of Dollars Raised through 2023 ActBlue by Committee Type")
+
+
+```
+```{r by cmte type wr 2023, echo=FALSE}
+
+# Compute percentages
+wr_by_cmte_tp_2023_clean<-wr_by_cmte_tp_2023%>%group_by(cmte_tp_clean)%>%summarise(ttl_raised=sum(ttl_raised))
+
+wr_by_cmte_tp_2023_clean$fraction = wr_by_cmte_tp_2023_clean$ttl_raised / sum(wr_by_cmte_tp_2023_clean$ttl_raised)
+
+# Compute the cumulative percentages (top of each rectangle)
+wr_by_cmte_tp_2023_clean$ymax = cumsum(wr_by_cmte_tp_2023_clean$fraction)
+
+# Compute the bottom of each rectangle
+wr_by_cmte_tp_2023_clean$ymin = c(0, head(wr_by_cmte_tp_2023_clean$ymax, n=-1))
+
+# Compute label position
+wr_by_cmte_tp_2023_clean$labelPosition <- (wr_by_cmte_tp_2023_clean$ymax + wr_by_cmte_tp_2023_clean$ymin) / 2
+
+# Compute a good label
+wr_by_cmte_tp_2023_clean$label <- paste0(wr_by_cmte_tp_2023_clean$cmte_tp_clean, "\n : ", wr_by_cmte_tp_2023_clean$fraction)
+ 
+# Make the plot
+wr_by_cmte_tp_2023_clean %>%
+ggplot(aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=cmte_tp_clean)) +
+     geom_rect() +
+     coord_polar(theta="y") + # Try to remove that to understand how the chart is built initially
+     xlim(c(2, 4))+# Try to remove that to see how to make a pie chart
+geom_text( x=3.5, aes(y=labelPosition, label=paste(round(fraction*100.00,1),'%')), color=hex$white_weak, size=3) +
+    sjm_theme()+
+    theme_void()+
+    scale_fill_manual(values=c(
+      hex$blue_weak
+      ,hex$cat_2_base
+      ,hex$cat_3_base
+      ,hex$cat_4_text
+      ,hex$blue_strong
+      ,hex$blue_base
+      ,hex$cat_99_base
+    ))+
+    theme(
+    text               = element_text(color = hex$cat_99_text, family = "Noto Sans"),
+    legend.position    = "top",
+    plot.title         = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle      = element_text(size = 9, margin = margin(9,0,9,0), hjust = 0.5)
+  )+
+  labs(fill = "Committee Type", title="Proportion of Dollars Raised through 2023 Winred by Committee Type")
+
+
+```
+1.total raised by cmte type, top committees, tips, tip rate, top days winred and actblue 
+
+2. Presidential: Biden Launch (vs. 2019 & other presidentials), Biden cumulative yoy, Biden vs. trump total and YOY include BVF & Trump PACs
+
+3. WinRed
+
+4. Senate/House/PAC yoy
+
+# Presidential Fundraising
+
+## Biden 2023 Campaign Launch
+
+President Biden launched his reelection campaign on April 25, 2023, exactly four years after first announcing his 2020 candidacy. 
+
+On April 25, 2023 Biden for President raised \$X.XM through ActBlue. Y.Y% less than his 2019 ActBlue fundraising total of $Z.ZM. Through June 30, 2023, the Biden for President campaign launch was the team's largest fundraising day through ActBlue. 
+
+Through June 30, 2023, Biden for President has reported $K.KM in total dollars raised from individuals Q.Q% of this was raised through ActBlue. Of all the money raised from individuals, T.T% came from unitemized donations. 
+
+ActBlue's top 5 Presidential launch days from the 2020 cycle are listed in the table below. 
+
+```{r pres_launches, echo=FALSE}
+pres_launch_ft<-pres_launches%>%arrange(desc(total_raised))%>%slice(1:5)
+pres_launch_ft<-pres_launch_ft%>%mutate(cmte_nm = str_to_title(cmte_nm))
+ft<-flextable(pres_launch_ft,
+              col_keys = c("recipient_cmte_id", "cmte_nm",  "contribution_date", "total_raised" ))
+ft <- set_header_labels(ft, 
+                        recipient_cmte_id = "Committee ID", 
+                        cmte_nm = "Committee Name",
+                        contribution_date = "Launch Date",
+                        total_raised = "Total Raised")
+ft <- colformat_double(ft, 
+  j = 4,
+  digits = 0,
+  prefix = "$",
+  suffix = "")
+
+ft <- autofit(ft)
+ft <- bg(ft, bg = hex$blue_weak, part = "header")
+
+ft
+
+```
+
+## Fundraising totals & front runner head to head 
+
+JFCs 
+
+## WinRed Presidential candidates with % WinRed 
+
+
+
+
+```{r top_recipients_ab_19, echo=FALSE}
+top_recipients_ft<-by_cmte_ab_2019_my%>%arrange(desc(total_raised))%>%slice(1:5)
+top_recipients_ft<-top_recipients_ft%>%mutate(cmte_nm_clean = str_to_title(cmte_nm), pct_filing_norm=100.00*pct_filing)
+ft_ii<-flextable(top_recipients_ft,
+              col_keys = c("recipient_cmte_id", "cmte_nm_clean",  "total_raised","pct_filing_norm" ))
+ft_ii <- set_header_labels(ft_ii, 
+                        recipient_cmte_id = "Committee ID", 
+                        cmte_nm_clean = "Committee Name",
+                        total_raised = "Total Raised",
+                        pct_filing_norm = "% Total Raised through ActBlue")
+ft_ii <- colformat_double(ft_ii, 
+  j = 3,
+  digits = 0,
+  prefix = "$",
+  suffix = "")
+ft_ii <- colformat_double(ft_ii, 
+  j = 4,
+  digits = 1,
+  prefix = "",
+  suffix = "%")
+
+ft_ii <- autofit(ft_ii)
+ft_ii <- bg(ft_ii, bg = hex$blue_weak, part = "header")
+
+ft_ii
+
+```
+
+```{r top_recipients_ab_23, echo=FALSE}
+top_recipients_ft_23<-by_cmte_ab_2023_my%>%arrange(desc(total_raised))%>%slice(1:5)
+top_recipients_ft_23<-top_recipients_ft_23%>%mutate(cmte_nm_clean = str_to_title(cmte_nm), pct_filing_norm=100.00*pct_filing)
+ft_iii<-flextable(top_recipients_ft_23,
+              col_keys = c("recipient_cmte_id", "cmte_nm_clean",  "total_raised","pct_filing_norm" ))
+ft_iii <- set_header_labels(ft_iii, 
+                        recipient_cmte_id = "Committee ID", 
+                        cmte_nm_clean = "Committee Name",
+                        total_raised = "Total Raised",
+                        pct_filing_norm = "% Total Raised through ActBlue")
+ft_iii <- colformat_double(ft_iii, 
+  j = 3,
+  digits = 0,
+  prefix = "$",
+  suffix = "")
+ft_iii <- colformat_double(ft_iii, 
+  j = 4,
+  digits = 1,
+  prefix = "",
+  suffix = "%")
+
+ft_iii <- autofit(ft_iii)
+ft_iii <- bg(ft_iii, bg = hex$blue_weak, part = "header")
+
+ft_iii
+
+```
+```{r top_recipients_wr_23, echo=FALSE}
+top_recipients_ft_23_wr<-by_cmte_wr_2023_my%>%arrange(desc(total_raised))%>%slice(1:5)
+top_recipients_ft_23_wr<-top_recipients_ft_23_wr%>%mutate(cmte_nm_clean = str_to_title(cmte_nm), pct_filing_norm=100.00*pct_filing)
+ft_iv<-flextable(top_recipients_ft_23_wr,
+              col_keys = c("recipient_cmte_id", "cmte_nm_clean",  "total_raised","pct_filing_norm" ))
+ft_iv <- set_header_labels(ft_iv, 
+                        recipient_cmte_id = "Committee ID", 
+                        cmte_nm_clean = "Committee Name",
+                        total_raised = "Total Raised",
+                        pct_filing_norm = "% Total Raised through WinRed")
+ft_iv <- colformat_double(ft_iv, 
+  j = 3,
+  digits = 0,
+  prefix = "$",
+  suffix = "")
+ft_iv <- colformat_double(ft_iv, 
+  j = 4,
+  digits = 1,
+  prefix = "",
+  suffix = "%")
+
+ft_iv <- autofit(ft_iv)
+ft_iv <- bg(ft_iv, bg = hex$blue_weak, part = "header")
+
+ft_iv
+
+```
+
+
+
