@@ -15,7 +15,7 @@ tips_raised_ab_2019_my<-
 ab_2019_toplines<-
 "select 
   count(*) as n_contributions
-  , count(distinct lower(contributor_last_name||', '||contributor_first_name)) as n_donors
+  , count(distinct lower(contributor_last_name||', '||contributor_first_name||'.'||contributor_zip_code)) as n_donors
   , count(distinct lower(memo_text_description)) as n_committees
   , sum(contribution_amount) as amt_raised
   

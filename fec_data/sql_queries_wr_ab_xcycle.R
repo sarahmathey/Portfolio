@@ -63,7 +63,7 @@ biden_my<-
 from actblue_2019_my as ab
 left join committees_2020 as cmte on ab.recipient_cmte_id=cmte.CMTE_ID
 
-where cmte.CMTE_ID='C00703975'
+where cmte.CMTE_ID in ('C00703975','C00744946','C00838912')
 
 group by 1,2,3,4,5
 
@@ -80,7 +80,7 @@ select
 from actblue_2023_my as ab
 left join committees_2024 as cmte on ab.recipient_cmte_id=cmte.CMTE_ID
 
-where cmte.CMTE_ID='C00703975'
+where cmte.CMTE_ID in ('C00703975','C00744946','C00838912')
 
 group by 1,2,3,4,5
 

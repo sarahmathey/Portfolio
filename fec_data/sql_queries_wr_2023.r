@@ -10,7 +10,7 @@ from winred_2023_my"
 wr_2023_toplines<-
 "select 
   count(*) as n_contributions
-  , count(distinct lower(contributor_last_name||', '||contributor_first_name)) as n_donors
+  , count(distinct lower(contributor_last_name||', '||contributor_first_name||'.'||contributor_zip_code)) as n_donors
   , count(distinct lower(memo_text_description)) as n_committees
   , sum(contribution_amount) as amt_raised
   
@@ -68,7 +68,7 @@ trump_my<-
 from winred_2023_my as wr
 left join committees_2024 as cmte on wr.recipient_cmte_id=cmte.CMTE_ID
 
-where cmte.CMTE_ID in ('C00828541')
+where cmte.CMTE_ID in ('C00828541','C00618371','C00618389','C00770941')
 
 group by 1,2,3,4,5
 order by 1,5 
@@ -90,3 +90,11 @@ order by 1
 )
 
 select * from dailys"
+
+trump_donor_occ_query<-"Select 
+  upper(contributor_occupation) as occupation
+  , count(distinct lower(contributor_first_name)||'.'||lower(contributor_last_name)||'.'||contributor_zip_code) as n_donors
+ from winred_2023_my
+ where recipient_cmte_id in ('C00618371','C00828541','C00618389','C00770941')
+ group by 1
+ order by 2 desc"

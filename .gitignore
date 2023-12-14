@@ -1,6 +1,7 @@
 # Specific Files #
 objects.py
 file_paths.R
+**/my_conduit_filing_analysis_files/
 
 # Compiled source #
 ###################
@@ -10,6 +11,7 @@ file_paths.R
 *.exe
 *.o
 *.so
+*.tex
 
 # Packages #
 ############

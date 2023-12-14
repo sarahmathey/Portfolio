@@ -14,7 +14,7 @@ where memo_text_description='CONTRIBUTION TO ACTBLUE'"
 ab_2023_toplines<-
 "select 
   count(*) as n_contributions
-  , count(distinct lower(contributor_last_name||', '||contributor_first_name)) as n_donors
+  , count(distinct lower(contributor_last_name||', '||contributor_first_name||'.'||contributor_zip_code)) as n_donors
   , count(distinct lower(memo_text_description)) as n_committees
   , sum(contribution_amount) as amt_raised
   
@@ -57,3 +57,11 @@ left join total_raised_in_filing on by_cmte.join_col=total_raised_in_filing.join
 group by 1,2,3,4,5
 order by 6 desc
 "
+
+biden_donor_occ_query<-"Select 
+  upper(contributor_occupation) as occupation
+  , count(distinct lower(contributor_first_name)||'.'||lower(contributor_last_name)||'.'||contributor_zip_code) as n_donors
+ from actblue_2023_my
+ where recipient_cmte_id in ('C00703975','C00744946','C00838912')
+ group by 1
+ order by 2 desc"
